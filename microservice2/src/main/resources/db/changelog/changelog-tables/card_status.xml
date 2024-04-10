@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.25.xsd">
+
+    <changeSet id="1" author="Nurlis">
+        <createTable tableName="card_status">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_card_status"/>
+            </column>
+            <column name="card_id" type="BIGINT"/>
+            <column name="status" type="VARCHAR(255)"/>
+        </createTable>
+        <addUniqueConstraint columnNames="card_id" constraintName="uc_card_status_card_id" tableName="card_status"/>
+    </changeSet>
+</databaseChangeLog>
