@@ -7,11 +7,12 @@ import jakarta.ws.rs.core.Response;
 import org.acme.producer.CardStatusProducer;
 import org.acme.service.CardStatusService;
 
+import java.util.logging.Logger;
+
 @Path("/microservice-1")
-@Produces(MediaType.APPLICATION_XML)
-@Consumes(MediaType.APPLICATION_XML)
 public class MainResource {
 
+    private static final Logger logger = Logger.getLogger(MainResource.class.getName());
     @Inject
     CardStatusService cardStatusService;
 
@@ -37,6 +38,7 @@ public class MainResource {
     }
     @GET
     @Path("/rabbit-mq/get-card-status")
+    @Produces(MediaType.TEXT_PLAIN)
     public Response asyncGetCardStatus(String requestBody) {
         return cardStatusProducer.asyncGetCardStatus(requestBody);
     }

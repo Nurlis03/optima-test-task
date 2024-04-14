@@ -60,8 +60,9 @@ public class CardStatusService {
                     .build();
         } catch (Exception e) {
             log.error("Failed to process request: " + e.getMessage(), e);
+            CardStatusResponse errorResponse = new CardStatusResponse(0, "Failed to process request: " + e.getMessage(), null);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                    .entity("Failed to process request: " + e.getMessage())
+                    .entity(errorResponse)
                     .build();
         }
     }
@@ -86,6 +87,7 @@ public class CardStatusService {
             } else {
                 // if status is not exist in redis cache
                 String cardResponse = cardStatusServiceClient.getCardStatus(requestBody); // may change this to getCardStatus(cardId, stan)
+                log.info(cardResponse);
                 if (!cardResponse.contains("<result>0</result>")) {
                     // If the card is found, save it to the cache with cardId
                     document = parseXml(cardResponse);

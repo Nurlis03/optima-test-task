@@ -92,10 +92,11 @@ public class CardStatusService {
                            .entity(badResponse)
                            .build();
         } catch (Exception e) {
+            CardStatusResponse errorResponse = new CardStatusResponse(0, "Failed to process request: " + e.getMessage(), null);
             log.error("Failed to process request: " + e.getMessage(), e);
             return Response.serverError()
-                           .entity("Failed to process request: " + e.getMessage())
-                           .build();
+                    .entity(errorResponse)
+                    .build();
         }
     }
 

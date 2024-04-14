@@ -5,19 +5,24 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.reactive.messaging.Channel;
 import org.eclipse.microprofile.reactive.messaging.Emitter;
+import org.eclipse.microprofile.reactive.messaging.Incoming;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.StringReader;
+import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.concurrent.CompletableFuture;
 
 @ApplicationScoped
 public class CardStatusProducer {
 
     private static final Logger logger = Logger.getLogger(CardStatusProducer.class.getName());
+
+    private CompletableFuture<String> responseFuture = new CompletableFuture<>();
 
     @Inject
     @Channel("card-status")
@@ -32,9 +37,7 @@ public class CardStatusProducer {
         }
         logger.log(Level.INFO, "Sending set card status request to RabbitMQ");
         cardStatusRequestEmitter.send(requestBody);
-        return Response.ok("send set card status request to rabbit mq. \n " +
-                        "Microservice 2 consume this message and handle it")
-                .build();
+        return null;
     }
 
     public Response asyncGetCardStatus(String requestBody) {
@@ -44,11 +47,28 @@ public class CardStatusProducer {
                     .entity("Invalid GetCardStatus request")
                     .build();
         }
+
+        responseFuture = new CompletableFuture<>();
+
         logger.log(Level.INFO, "Sending get card status xml request to RabbitMQ");
         cardStatusRequestEmitter.send(requestBody);
-        return Response.ok("send get card status xml request to rabbit mq. \n " +
-                        "Microservice 2 consume this message and handle it")
-                .build();
+
+        try {
+            // Ждем ответа от микросервиса 2
+            String response = responseFuture.get();
+
+            logger.info(response);
+            return Response.ok(response).build();
+        } catch (InterruptedException | ExecutionException e) {
+            logger.log(Level.SEVERE, "Failed to get response from microservice 2", e);
+            return Response.serverError().build();
+        }
+    }
+
+    @Incoming("response-channel")
+    public void getResponse(String response) {
+        // Завершаем CompletableFuture с полученным ответом
+        responseFuture.completeAsync(() -> response);
     }
 
     private boolean isValidRequest(String requestBody, String methodType) {
