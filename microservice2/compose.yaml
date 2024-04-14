@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  microservice2:
+    container_name: microservice2
+    image: microservice2
+    build: .
+    ports:
+      - "3333:3333"
+    depends_on:
+      - db
+      - rabbitmq
+    networks:
+      - micro1_micro2_network
+
+  db:
+    container_name: db
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_DB: card
+      POSTGRES_USER: Nurlis
+      POSTGRES_PASSWORD: Nurlis2003
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - micro1_micro2_network
+
+  rabbitmq:
+    container_name: rabbitmq
+    image: rabbitmq:3-management
+    hostname: rabbitmq
+    restart: always
+    environment:
+      - RABBITMQ_DEFAULT_USER=Nur
+      - RABBITMQ_DEFAULT_PASS=Nur2003
+    ports:
+      - "5672:5672"
+      - "15672:15672" # for web interface
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - micro1_micro2_network
+
+
+networks:
+  micro1_micro2_network:
+    external: true
+    driver: bridge
+
+volumes:
+  db_data:
+  rabbitmq_data:

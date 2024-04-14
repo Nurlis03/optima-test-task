@@ -1,22 +1,23 @@
 package org.acme.redis;
 
+import io.quarkus.redis.datasource.value.ValueCommands;
+import io.quarkus.redis.datasource.RedisDataSource;
 import jakarta.enterprise.context.ApplicationScoped;
-import redis.clients.jedis.Jedis;
 
 @ApplicationScoped
 public class RedisCache {
 
-    private final Jedis jedis;
+    private final ValueCommands<String, String> redisCommands;
 
-    public RedisCache() {
-        this.jedis = new Jedis("localhost", 6379);
+    public RedisCache(RedisDataSource ds) {
+        redisCommands = ds.value(String.class);
     }
 
     public void setex(String key, String value) {
-        jedis.setex(key, 30, value);
+        redisCommands.setex(key, 30, value);
     }
 
     public String get(String key) {
-        return jedis.get(key);
+        return redisCommands.get(key);
     }
 }

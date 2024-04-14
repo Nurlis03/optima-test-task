@@ -1,6 +1,6 @@
 FROM openjdk
 
-WORKDIR /microservice1
+WORKDIR /microservice2
 
 COPY . .
 
