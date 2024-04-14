@@ -37,7 +37,9 @@ public class CardStatusProducer {
         }
         logger.log(Level.INFO, "Sending set card status request to RabbitMQ");
         cardStatusRequestEmitter.send(requestBody);
-        return null;
+
+        // Возвращаем ответ о том, что запрос успешно отправлен
+        return Response.ok("Set card status request sent successfully").build();
     }
 
     public Response asyncGetCardStatus(String requestBody) {
