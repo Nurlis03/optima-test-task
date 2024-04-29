@@ -7,15 +7,12 @@ import jakarta.ws.rs.core.Response;
 import org.acme.dto.CardStatusMethod;
 import org.acme.dto.CardStatusParameters;
 import org.acme.dto.CardStatusResponse;
+import org.acme.producer.CardStatusProducer;
 import org.acme.redis.RedisCache;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
+import org.acme.parser.CardStatusParser;
 import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.xml.sax.InputSource;
 
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import java.io.StringReader;
 import java.util.Objects;
 
 import org.jboss.logging.Logger;
@@ -28,14 +25,19 @@ public class CardStatusService {
     @Inject
     RedisCache redisCache;
 
-    public Response setCardStatus(String requestBody) {
-        try {
-            Document document = parseXml(requestBody);
-            String cardId = extractItem(document, "cardID");
-            String newStatus = extractItem(document, "status");
+    @Inject
+    CardStatusParser parser;
 
+    @Inject
+    CardStatusProducer producer;
+
+    public Response setCardStatus(String requestBody, String typeRequest) {
+        try {
+            Document document = parser.parseXml(requestBody);
+            String cardId = parser.extractItem(document, "cardID", "SetCardStatus");
+            String newStatus = parser.extractItem(document, "status", "SetCardStatus");
             String cardIdKey = String.format("cardId:%s", cardId);
-            String stan = extractAttribute(document, "method", "stan");
+            String stan = parser.extractAttribute(document, "method", "stan");
 
             CardStatusMethod method = new CardStatusMethod("SetCardStatus", stan, null);
             CardStatusResponse cardStatusResponse = new CardStatusResponse(1, "SUCCESS", method);
@@ -48,8 +50,18 @@ public class CardStatusService {
                 return Response.ok(cardStatusResponse).build();
             }
 
-            // Forward the request to the service client if no change in status or cache miss
-            cardStatusServiceClient.setCardStatus(requestBody); // may change this to getCardStatus(cardId, newStatus, stan)
+            if (typeRequest.equals("sync")) {
+                // Forward the request to the service client if no change in status or cache miss
+                cardStatusServiceClient.setCardStatus(requestBody); // may change this to getCardStatus(cardId, newStatus, stan)
+            }
+            else if (typeRequest.equals("async")) {
+                if (parser.isValidRequest(document, "SetCardStatus")) {
+                    producer.asyncSetCardStatus(requestBody);
+                }
+                else {
+                    throw new BadRequestException("The name of the \"SetCardStatus\" method is missing. Set the method name");
+                }
+            }
 
             return Response.ok(cardStatusResponse).build();
         } catch (BadRequestException e) {
@@ -67,13 +79,12 @@ public class CardStatusService {
         }
     }
 
-    public Response getCardStatus(String requestBody) {
+    public Response getCardStatus(String requestBody, String typeRequest) {
         try {
-            Document document = parseXml(requestBody);
-            String cardId = extractItem(document, "cardID");
-
+            Document document = parser.parseXml(requestBody); // Используем метод parseXml из парсера
+            String cardId = parser.extractItem(document, "cardID", "GetCardStatus"); // Используем метод extractItem из парсера
             String cardIdKey = String.format("cardId:%s", cardId);
-            String stan = extractAttribute(document, "method", "stan");
+            String stan = parser.extractAttribute(document, "method", "stan"); // Используем метод extractAttribute из парсера
 
             String status = redisCache.get(cardIdKey);
 
@@ -86,12 +97,25 @@ public class CardStatusService {
                 return Response.ok(cardStatusResponse).build();
             } else {
                 // if status is not exist in redis cache
-                String cardResponse = cardStatusServiceClient.getCardStatus(requestBody); // may change this to getCardStatus(cardId, stan)
+                String cardResponse = "";
+                if (typeRequest.equals("sync")) {
+                    // Forward the request to the service client if no change in status or cache miss
+                    cardResponse = cardStatusServiceClient.getCardStatus(requestBody); // may change this to getCardStatus(cardId, newStatus, stan)
+                }
+                else if (typeRequest.equals("async")) {
+                    if (parser.isValidRequest(document, "GetCardStatus")) {
+                        cardResponse = producer.asyncGetCardStatus(requestBody);
+                    }
+                    else {
+                        throw new BadRequestException("The name of the \"GetCardStatus\" method is missing. Set the method name");
+                    }
+                }
+
                 log.info(cardResponse);
                 if (!cardResponse.contains("<result>0</result>")) {
                     // If the card is found, save it to the cache with cardId
-                    document = parseXml(cardResponse);
-                    status = extractItem(document, "status");
+                    document = parser.parseXml(cardResponse);
+                    status = parser.extractItem(document, "status", "GetCardStatus");
                     redisCache.setex(cardIdKey, status);
                     log.infof("Saved card status to Redis cache. Key: '%s', Value: '%s'", cardIdKey, status);
 
@@ -109,35 +133,11 @@ public class CardStatusService {
             return Response.status(Response.Status.BAD_REQUEST)
                     .entity(badResponse)
                     .build();
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             log.error("Failed to process request: " + e.getMessage(), e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
                     .entity("Failed to process request: " + e.getMessage())
                     .build();
         }
-    }
-
-    public Document parseXml(String xmlString) throws Exception {
-        try (StringReader stringReader = new StringReader(xmlString)) {
-            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-            DocumentBuilder builder = factory.newDocumentBuilder();
-            return builder.parse(new InputSource(stringReader));
-        }
-    }
-
-    public String extractItem(Document document, String tagName) {
-        Element element = (Element) document.getElementsByTagName(tagName).item(0);
-        if (element == null) {
-            log.error("Bad request: Tag '" + tagName + "' not found in request");
-            throw new BadRequestException("Tag '" + tagName + "' not found in request");
-        }
-        log.infof("Received request to process GetCardStatus. %s: %s", tagName, element.getTextContent());
-        return element.getTextContent();
-    }
-
-    public String extractAttribute(Document document, String tagName, String attributeName) {
-        Element element = (Element) document.getElementsByTagName(tagName).item(0);
-        return element.getAttribute(attributeName);
     }
 }

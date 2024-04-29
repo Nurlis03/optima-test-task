@@ -17,14 +17,27 @@ services:
     container_name: db
     image: postgres
     restart: always
+    ports:
+      - "5432:5432"
+
     environment:
       POSTGRES_DB: card
       POSTGRES_USER: Nurlis
       POSTGRES_PASSWORD: Nurlis2003
-    ports:
-      - "5432:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
+    networks:
+      - micro1_micro2_network
+
+  pgadmin:
+    container_name: pgadmin4_container
+    image: dpage/pgadmin4
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: kimbiletovnurlis03@gmail.com
+      PGADMIN_DEFAULT_PASSWORD: root
+    ports:
+      - "5050:80"
     networks:
       - micro1_micro2_network
 
